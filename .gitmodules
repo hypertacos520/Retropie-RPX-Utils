@@ -1,0 +1,9 @@
+[submodule "Resources/Submodules/Gamepad"]
+	path = Resources/Submodules/Gamepad
+	url = https://github.com/piborg/Gamepad
+[submodule "Resources/Submodules/pyDispmanx"]
+	path = Resources/Submodules/pyDispmanx
+	url = https://github.com/eclispe/pyDispmanx
+[submodule "Resources/Submodules/raspi2png"]
+	path = Resources/Submodules/raspi2png
+	url = https://github.com/AndrewFromMelbourne/raspi2png
