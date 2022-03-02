@@ -1,9 +1,10 @@
 import subprocess, os, psutil, getpass
 from datetime import datetime
+from PIL import Image
 
 #The process names in the following list will not be affected by the freeze, resume, and terminate functions
 #This list may need modified based on newer retropie installations
-necessaryProcesses = ['bash', 'pegasus-fe', 'ps', 'python3', 'sshd', 'systemd', '(sd-pam)', 'dbus-daemon', 'sudo', 'sftp-server']
+necessaryProcesses = ['bash', 'pegasus-fe', 'ps', 'python3', 'sshd', 'systemd', '(sd-pam)', 'dbus-daemon', 'sudo', 'sftp-server', 'xinit', 'Xorg', 'retropie_xinitr']
 
 #Determines if a given string is a real numerical value
 def is_integer(n):
@@ -64,12 +65,14 @@ def terminate_processes():
         os.kill(int(processList[i]), 9)#sends KILL signal
         dontFreeze = 0
         print('Process Terminated. ID: ' + str(processList[i]) + ' Name: ' + str(processList[i+1])) #Debug Statement
+        relaunch_pegasus()
+    
 
 #Returns a list of the currently running processes in the following form:
 #pid1, pname1, pid2, pname2, pid3, pname3...
 #This is the old implementation. If no issues are found in the new version this will be depricated
 #Old implementation relies heavily on string processing and has a lot of potential for problems
-def get_running_processes_old():
+def get_running_processes():
     string = subprocess.run(['ps', '-a'], stdout=subprocess.PIPE)
     li = list(str(string).split(" "))
     newLi = []
@@ -100,7 +103,7 @@ def get_running_processes_old():
 
 #Returns a list of the currently running processes in the following form:
 #pid1, pname1, pid2, pname2, pid3, pname3...
-def get_running_processes():
+def get_running_processes_new():
     username = getpass.getuser()
     runningProcesses = []
     for proc in psutil.process_iter():
@@ -143,24 +146,55 @@ def is_process_active(pid):
                 return True
     return False
 
+#Relaunches pegasus if it closed for some reason
+def relaunch_pegasus():
+    pegasusFound = 0
+    processList = get_running_processes()
+    for i in range(len(processList)):
+        if (is_integer(i)):
+            continue
+        else:
+            if (i == "pegasus-fe"):
+                pegasusFound = 1
+    if (pegasusFound):
+        return
+    else:
+        print("Restarting Pegasus Frontend...")
+        subprocess.run(['pegasus-fe'], stdout=subprocess.PIPE)
+        return
+
 #Takes a screenshot using raspi2png
-#Retropie has no window manager making this process dificult, hence the need for this function
+#Retropie has no window manager making this process a little more difficult than normal, hence the need for this function
 #Save is a binary value that will save the image to 1 of 2 locations
-#Save == 0 | /Resources/Temp/Temp.png
+#Save == 0 | /Resources/Temp/Temp.png & Temp.bmp
 #Save == 1 | ../Screenshots/(datetime.now()).png
 def take_screenshot(save):
     currentDirectory = os.path.dirname(os.path.realpath(__file__))
     if(save):
-        saveLocation = currentDirectory + '../Screenshots/' + str(datetime.now()) + ".png"
+        saveLocation = currentDirectory + '../Screenshots/' + str(datetime.now()) + '.png'
     else:
         saveLocation = currentDirectory + '/Resources/Temp/Temp.png'
     print(subprocess.run(['raspi2png', '-p', saveLocation], stdout=subprocess.PIPE)) #print is for debug
+    if (saveLocation == currentDirectory + '/Resources/Temp/Temp.png'): #Creates bmp image for use in pygame
+        temp = Image.open(currentDirectory + '/Resources/Temp/Temp.png')
+        temp.save(currentDirectory + '/Resources/Temp/Temp.bmp')
 
+#Takes temp screenshot and saves it perminantely
+def save_temp_screenshot():
+    currentDirectory = os.path.dirname(os.path.realpath(__file__))
+    temp = Image.open(currentDirectory + '/Resources/Temp/Temp.png')
+    temp.save(currentDirectory + '../Screenshots/' + str(datetime.now()) + '.png')
+    
 
 #testing functions
 if __name__ == '__main__':
-    print("get_running_processes_old output:")
-    print(get_running_processes_old())
+    try:
+        print("get_running_processes_old output:")
+        print(get_running_processes_old())
+    except:
+        print("get_running_processes_old not supported on this device")
 
+    #on a linux dev computer this output is MESSY
+    #on windows it outputs literally nothing
     print("get_running_processes output:")
     print(get_running_processes())
