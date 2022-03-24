@@ -1,4 +1,4 @@
-import pygame, os
+import pygame, os, gc
 try:
     import pydispmanx
 except:
@@ -19,15 +19,10 @@ primaryColor = (81, 81, 81) #Button color for In-Game Menu
 currentDir = os.path.dirname(os.path.realpath(__file__)) #Dynamically find file directory
 
 #Other Variable Definitions
-screenX = None
-screenY = None
-screen = None
 pyManXLayer = None
-font = None
-mainClock = None
 
 #Create Surfaces for PyGame to run on
-def init_pygame_runtime(dispmanXLayerOffset):
+def init_pygame_runtime(dispmanXLayerOffset, fontModifier = 35):
     global screenX
     global screenY
     global pyManXLayer
@@ -43,12 +38,12 @@ def init_pygame_runtime(dispmanXLayerOffset):
         screen = pygame.image.frombuffer(pyManXLayer, pyManXLayer.size, 'RGBA')
     #Otherwise...
     except: 
-        screenX = 854 #Screen X dimension when pydispmanx is not present
+        screenX = 800 #Screen X dimension when pydispmanx is not present
         screenY = 480 #Screen Y dimension when pydispmanx is not present
         screen = pygame.display.set_mode((screenX, screenY),0,32)
 
     pygame.init()
-    font = pygame.font.SysFont(None, int(screenX/30)) #Dynamically set font size
+    font = pygame.font.SysFont(pygame.font.get_default_font(), int(screenX/fontModifier)) #Dynamically set font size
     mainClock = pygame.time.Clock() #Initialize PyGame Clock
 
 def end_pygame_runtime():
@@ -60,13 +55,14 @@ def end_pygame_runtime():
     global pyManXLayer
 
     pygame.quit()
-    del(screenX)
-    del(screenY)
-    del(screen)
-    del(font)
-    del(mainClock)
+    del screenX
+    del screenY
+    del screen
+    del font
+    del mainClock
     if (pyManXLayer):
-        del(pyManXLayer)
+        del pyManXLayer
+    gc.collect()
 
 #Load In-Game Overlay Assets
 #Made a function so items can quickly be loaded and removed from memory
@@ -84,12 +80,20 @@ def load_ingame_assets():
     assets.append(pygame.image.load(currentDir + "/Resources/Images/cross-round.bmp"))          #Cross Icon   | 7
     return assets #Return the Asset Buffer
 
-def load_notification_assets():
+def load_notification_assets(load_index = None):
     assets = [] #Asset Buffer
-    #Audio
-    assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/notification.wav"))         #Notification | 0
-    #Graphics
-    assets.append(pygame.image.load(currentDir + "/Resources/Images/controller.bmp"))           #Controller   | 1
+    if(load_index == 0): #Achievement
+        assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/achievement.wav"))          #Audio | 0
+        assets.append(pygame.image.load(currentDir + "/Resources/Images/trophy.bmp"))               #Icon  | 1
+        assets.append("Trophy:")                                                                    #Text  | 2
+    elif(load_index == 1): #Controller Status
+        assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/notification.wav"))         #Audio | 0
+        assets.append(pygame.image.load(currentDir + "/Resources/Images/controller.bmp"))           #Icon  | 1
+        assets.append("Controller:")                                                                #Text  | 2
+    elif(load_index == 2): #Network Status
+        assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/notification.wav"))         #Audio | 0
+        assets.append(pygame.image.load(currentDir + "/Resources/Images/controller.bmp"))           #Icon  | 1
+        assets.append("Network:")                                                                   #Text  | 2
     return assets #Return the Asset Buffer
 
 #Draw Text on surface with color and x + y coordinates
@@ -122,8 +126,9 @@ def ingame_overlay_main():
     #Check Icon  | Image | i == 6
     #Cross Icon  | Image | i == 7
 
+    pygame.mixer.Sound.play(AssetList[0])
     while(isRunning):
-        #Redraw Menu
+        screen.fill(0) #Updates Background Changes
         #Menu Buttons
         #Back Button
         button_1 = pygame.draw.circle(screen, primaryColor, (screenX/6, screenY/2), screenY/6)
@@ -146,61 +151,120 @@ def ingame_overlay_main():
             i = i + 1
 
     #Clear Display and Unload Assets
+    del AssetList #Unload Assets
     end_pygame_runtime() #Close pygame surfaces
-    del(AssetList) #Unload Assets
     return
 
 #Display a Notification
 #Functionally, the user cannot interact with these. They are mainly for relaying info to the user.
 #This function is awesome but will need to be run on another thread as it needs to wait for pygame
 #to finish closing before it can return anything.
+
+#Notification Type Index Values:
+#Achievement | i == 0
+#Controller  | i == 1
+#Wireless    | i == 2
+
 def send_system_notification(notificationType, notificationText):
     isRunning = True
     init_pygame_runtime(1)
-    AssetList = load_notification_assets() #Change to Notification Icon List
+    AssetList = load_notification_assets(notificationType) #Change to Notification Icon List
     notificationWidth = screenX/4.25 #Width can be modified as needed
     notificationHeight = screenY/10 #Height can be modified as needed
     renderOffset = -1 * notificationWidth
     runtime = 0
 
-    if(notificationType != None):
-        icon = pygame.transform.scale(AssetList[notificationType], (int(notificationHeight), int(notificationHeight)))
-
     #Asset Index Values:
-    #Notification | Audio | i == 0
-    #Controller   | Image | i == 1
+    #Audio | i == 0
+    #Image | i == 1
+    #Text  | i == 2
+
+    icon = pygame.transform.scale(AssetList[1], (int(notificationHeight), int(notificationHeight)))
 
     pygame.mixer.Sound.play(AssetList[0])
     while(isRunning):
+        #Draw Notification Box
+        screen.fill(0) #Updates Background Changes
         notificationBox = pygame.draw.rect(screen, primaryColor, (screenX - notificationWidth - renderOffset, notificationHeight * 1.5, notificationWidth, notificationHeight))
         pygame.draw.rect(screen, cursorColor, (screenX - notificationWidth - renderOffset, notificationHeight * 1.5, notificationWidth/26, notificationHeight))
-        #Display Notification
-        if(notificationType != None): #Controller Connected/Disconnected
-            screen.blit(icon, (notificationBox.x + notificationWidth/16, notificationBox.y))
-            draw_text("Controller", font, (255,255,255), screen, notificationBox.x + notificationWidth/3, notificationBox.y + notificationHeight/6)
-            draw_text(notificationText, font, (255,255,255), screen, notificationBox.x + notificationWidth/3, notificationBox.y + notificationHeight/2)
-        else: #General Notification
-            draw_text(notificationText, font, (255,255,255), screen, notificationBox.x + notificationWidth/20, notificationBox.y + notificationHeight/3)
+
+        #Notification Content
+        screen.blit(icon, (notificationBox.x + notificationWidth/16, notificationBox.y))
+        draw_text(AssetList[2], font, (255,255,255), screen, notificationBox.x + notificationWidth/3, notificationBox.y + notificationHeight/6)
+        draw_text(notificationText, font, (255,255,255), screen, notificationBox.x + notificationWidth/3, notificationBox.y + notificationHeight/2)
+
         #Update Screen
         try:
             pyManXLayer.updateLayer()
         except:
             pygame.display.update()
         mainClock.tick(60)
-        if(runtime >= 550):
+        if(runtime >= 375):
             isRunning = 0
+        elif(runtime >= 300):
+            if (-1 * renderOffset < notificationWidth):
+                renderOffset = renderOffset - notificationWidth/24
+            runtime = runtime + 1
         else:
             if (renderOffset < 0):
-                renderOffset = renderOffset + notificationWidth/12
+                renderOffset = renderOffset + notificationWidth/24
             runtime = runtime + 1
     
     #Clear Display and Unload Assets
+    del AssetList #Unload Assets
     end_pygame_runtime() #Close pygame surfaces
-    del(AssetList) #Unload Assets
+    return
+
+#Display a Notification
+#Functionally, the user cannot interact with these. They are mainly for relaying info to the user.
+#This function is awesome but will need to be run on another thread as it needs to wait for pygame
+#to finish closing before it can return anything.
+def send_custom_notification(notificationText):
+    isRunning = True
+    init_pygame_runtime(1)
+    notificationSound = pygame.mixer.Sound(currentDir + "/Resources/Audio/notification.wav")
+    notificationWidth = screenX/4.25 #Width can be modified as needed
+    notificationHeight = screenY/10 #Height can be modified as needed
+    renderOffset = -1 * notificationWidth
+    runtime = 0
+
+    pygame.mixer.Sound.play(notificationSound)
+    while(isRunning):
+        #Draw Notification Box
+        screen.fill(0) #Updates Background Changes
+        notificationBox = pygame.draw.rect(screen, primaryColor, (screenX - notificationWidth - renderOffset, notificationHeight * 1.5, notificationWidth, notificationHeight))
+        pygame.draw.rect(screen, cursorColor, (screenX - notificationWidth - renderOffset, notificationHeight * 1.5, notificationWidth/26, notificationHeight))
+
+        #Notification Content
+        draw_text(notificationText, font, (255,255,255), screen, notificationBox.x + notificationWidth/20, notificationBox.y + notificationHeight/3)
+
+        #Update Screen
+        try:
+            pyManXLayer.updateLayer()
+        except:
+            pygame.display.update()
+        mainClock.tick(60)
+        if(runtime >= 375):
+            isRunning = 0
+        elif(runtime >= 300):
+            if (-1 * renderOffset < notificationWidth):
+                renderOffset = renderOffset - notificationWidth/24
+            runtime = runtime + 1
+        else:
+            if (renderOffset < 0):
+                renderOffset = renderOffset + notificationWidth/24
+            runtime = runtime + 1
+    
+    #Clear Display and Unload Assets
+    del notificationSound #Unload Assets
+    end_pygame_runtime() #Close pygame surfaces
     return
 
 #Test Functions
 if __name__ == '__main__':
-    send_system_notification(1, "Connected")
+    send_system_notification(0, "Climb a Mountain") #Achievement
+    send_system_notification(0, "Close the Game")
+    send_system_notification(1, "Connected") #Controller Update
     send_system_notification(1, "Disconnected")
-    send_system_notification(None, "Just saying hi")
+    send_custom_notification("Just saying hi") #General System Notification
+    ingame_overlay_main()

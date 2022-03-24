@@ -65,14 +65,14 @@ def terminate_processes():
         os.kill(int(processList[i]), 9)#sends KILL signal
         dontFreeze = 0
         print('Process Terminated. ID: ' + str(processList[i]) + ' Name: ' + str(processList[i+1])) #Debug Statement
-        relaunch_pegasus()
+        #relaunch_pegasus()
     
 
 #Returns a list of the currently running processes in the following form:
 #pid1, pname1, pid2, pname2, pid3, pname3...
 #This is the old implementation. If no issues are found in the new version this will be depricated
 #Old implementation relies heavily on string processing and has a lot of potential for problems
-def get_running_processes():
+def get_running_processes_old():
     string = subprocess.run(['ps', '-a'], stdout=subprocess.PIPE)
     li = list(str(string).split(" "))
     newLi = []
@@ -103,7 +103,7 @@ def get_running_processes():
 
 #Returns a list of the currently running processes in the following form:
 #pid1, pname1, pid2, pname2, pid3, pname3...
-def get_running_processes_new():
+def get_running_processes():
     username = getpass.getuser()
     runningProcesses = []
     for proc in psutil.process_iter():
