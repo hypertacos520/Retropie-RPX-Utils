@@ -4,7 +4,10 @@ from PIL import Image
 
 #The process names in the following list will not be affected by the freeze, resume, and terminate functions
 #This list may need modified based on newer retropie installations
-necessaryProcesses = ['bash', 'pegasus-fe', 'ps', 'python3', 'sshd', 'systemd', '(sd-pam)', 'dbus-daemon', 'sudo', 'sftp-server', 'xinit', 'Xorg', 'retropie_xinitr']
+necessaryProcesses = ['bash', 'ps', 'python3', 'sshd', 'systemd', '(sd-pam)', 'dbus-daemon', 'sudo', 'sftp-server', 'xinit', 'Xorg', 'retropie_xinitr']
+frontend = 'pegasus-fe' #Can be changed to your frontend
+
+necessaryProcesses.append(frontend)
 
 #Determines if a given string is a real numerical value
 def is_integer(n):
@@ -31,6 +34,26 @@ def freeze_processes():
         os.kill(int(processList[i]), 19)#sends STOP signal
         dontFreeze = 0
         print('Process Frozen. ID: ' + str(processList[i]) + ' Name: ' + str(processList[i+1])) #Debug Statement
+
+#Freezes only the frontend
+def freeze_frontend():
+    processList = get_running_processes()
+    for i in range(len(processList)):
+        if i % 2 != 0:
+            continue
+        if frontend == processList[i+1]:
+            os.kill(int(processList[i]), 19)#sends STOP signal
+            print('Process Frozen. ID: ' + str(processList[i]) + ' Name: ' + str(processList[i+1])) #Debug Statement
+
+#Resume only the frontend
+def resume_frontend():
+    processList = get_running_processes()
+    for i in range(len(processList)):
+        if i % 2 != 0:
+            continue
+        if frontend == processList[i+1]:
+            os.kill(int(processList[i]), 18)#sends CONT signal
+            print('Process Frozen. ID: ' + str(processList[i]) + ' Name: ' + str(processList[i+1])) #Debug Statement
 
 #Resumes all processes besides those in the necessaryProcesses list
 def resume_processes():
@@ -67,39 +90,6 @@ def terminate_processes():
         print('Process Terminated. ID: ' + str(processList[i]) + ' Name: ' + str(processList[i+1])) #Debug Statement
         #relaunch_pegasus()
     
-
-#Returns a list of the currently running processes in the following form:
-#pid1, pname1, pid2, pname2, pid3, pname3...
-#This is the old implementation. If no issues are found in the new version this will be depricated
-#Old implementation relies heavily on string processing and has a lot of potential for problems
-def get_running_processes_old():
-    string = subprocess.run(['ps', '-a'], stdout=subprocess.PIPE)
-    li = list(str(string).split(" "))
-    newLi = []
-    for item in li:
-        if item == '':
-            continue
-        else:
-            newLi.append(item)
-    evenNewerLi = []
-    i = 0
-    currentPos = 0
-    for item in newLi:
-        if is_integer(item):
-            evenNewerLi.append(item)
-            currentPos = currentPos + 1
-            continue
-        if currentPos == 3:
-            evenNewerLi.append(item.replace('\\n', ''))
-            currentPos = 0
-            i = i + 1
-            continue
-        if currentPos > 0:
-            currentPos = currentPos + 1
-    finalList = []
-    for item in evenNewerLi:
-        finalList.append(item.replace("')", ""))
-    return finalList
 
 #Returns a list of the currently running processes in the following form:
 #pid1, pname1, pid2, pname2, pid3, pname3...
@@ -188,12 +178,6 @@ def save_temp_screenshot():
 
 #testing functions
 if __name__ == '__main__':
-    try:
-        print("get_running_processes_old output:")
-        print(get_running_processes_old())
-    except:
-        print("get_running_processes_old not supported on this device")
-
     #on a linux dev computer this output is MESSY
     #on windows it outputs literally nothing
     print("get_running_processes output:")

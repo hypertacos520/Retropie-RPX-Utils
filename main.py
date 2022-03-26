@@ -17,14 +17,7 @@ def toggle_quick_menu():
     print("Is a game currently running?: " + str(isInGame))
     if isInGame:
         systemFunctions.freeze_processes() #This line is dangerous to run on the dev computer! Make sure to comment out before testing
-        try:
-            systemFunctions.take_screenshot(0) #Does not work on dev pc
-        except:
-            pass
-        # menuSelection = go.ingame_overlay_main() #New overlay function
-        # ^^Skipping for now just for testing purposes
-        time.sleep(1)
-        menuSelection = 1
+        menuSelection = go.ingame_overlay_main(isInGame) #New overlay function
         try:
             if menuSelection == 0:
                 print("Resuming Current Application...")
@@ -32,6 +25,12 @@ def toggle_quick_menu():
             elif menuSelection == 1:
                 print("Exiting Current Application...")
                 systemFunctions.terminate_processes()
+            elif menuSelection == 2:
+                try:
+                    systemFunctions.take_screenshot(0) #Does not work on dev pc
+                    #Open save option menu
+                except:
+                    pass
             else:
                 print("No Valid Input Made By User. Resuming Current Application...")
                 systemFunctions.resume_processes()
@@ -40,6 +39,20 @@ def toggle_quick_menu():
             systemFunctions.resume_processes()
         del menuSelection
         del isInGame
+    else:
+        systemFunctions.freeze_frontend()
+        menuSelection = go.ingame_overlay_main(isInGame) #New overlay function
+        if menuSelection == 0:
+            systemFunctions.resume_frontend()
+        elif menuSelection == 1:
+            try:
+                systemFunctions.take_screenshot(0) #Does not work on dev pc
+                #Open save option menu
+            except:
+                pass
+        else:
+            print("No Valid Input Made By User. Resuming Current Application...")
+            systemFunctions.resume_frontend()
 
 #Main loop for controller input
 def controller_loop():

@@ -1,4 +1,5 @@
 import pygame, os, gc
+from pygame.locals import *
 try:
     import pydispmanx
 except:
@@ -30,6 +31,8 @@ def init_pygame_runtime(dispmanXLayerOffset, fontModifier = 35):
     global font
     global mainClock
     global ManXLayerNum
+    global Joystick
+    global releaseCheck
 
     #If DispmanX is present...
     try:
@@ -46,6 +49,14 @@ def init_pygame_runtime(dispmanXLayerOffset, fontModifier = 35):
     font = pygame.font.SysFont(pygame.font.get_default_font(), int(screenX/fontModifier)) #Dynamically set font size
     mainClock = pygame.time.Clock() #Initialize PyGame Clock
 
+    #Joystick Initialization
+    releaseCheck = 0
+    joystickCount = pygame.joystick.get_count()
+    Joystick = None
+    for i in range(joystickCount):
+        Joystick = pygame.joystick.Joystick(i)
+        Joystick.init()
+
 def end_pygame_runtime():
     global screenX
     global screenY
@@ -53,6 +64,8 @@ def end_pygame_runtime():
     global font
     global mainClock
     global pyManXLayer
+    global Joystick
+    global releaseCheck
 
     pygame.quit()
     del screenX
@@ -60,6 +73,8 @@ def end_pygame_runtime():
     del screen
     del font
     del mainClock
+    del Joystick
+    del releaseCheck
     if (pyManXLayer):
         del pyManXLayer
     gc.collect()
@@ -97,12 +112,65 @@ def load_notification_assets(load_index = None):
     return assets #Return the Asset Buffer
 
 #Draw Text on surface with color and x + y coordinates
-def draw_text(text, font, color, surface, x, y):
+def draw_text(text, font, color, surface, x, y, center = 0):
     textobj = font.render(text, 1, color)
     textrect = textobj.get_rect()
-    textrect.topleft = (x, y)
+    textrect.topleft = (x - (center * (textrect.width/2)), y)
     surface.blit(textobj, textrect)
 
+#Render Menu Selection based on index location
+def menu_selector(menuLocation, buttonList, menuContents):
+    for index, button in enumerate(buttonList):
+        if(index != menuLocation):
+            continue
+        else:
+            pygame.draw.circle(screen, cursorColor, (button.x + (button.width/2), button.y + (button.height/2)), (button.height/2) + 4, width=4)
+            draw_text(menuContents[menuLocation], font, cursorColor, screen, button.x + (button.width/2), button.y - (button.height/4), 1)
+
+def get_user_input(soundFX, i, indexLimit):
+    global releaseCheck
+    global Joystick
+
+    buttonPressed = False
+
+    #GAMEPAD INPUT
+    if (Joystick != None):
+        if Joystick.get_axis(0) > 0.2 and releaseCheck == 0:
+            releaseCheck = 1
+            pygame.mixer.Sound.play(soundFX)
+            i = i + 1
+        elif Joystick.get_axis(0) < -0.2 and releaseCheck == 0:
+            releaseCheck = 1
+            pygame.mixer.Sound.play(soundFX)
+            i = i - 1
+        elif Joystick.get_axis(0) < 0.2 and Joystick.get_axis(0) > -0.2 and Joystick.get_button(0) == 0:
+            releaseCheck = 0
+
+        if Joystick.get_button(0) == 1 and releaseCheck == 0:
+            releaseCheck = 1
+            buttonPressed = True
+
+    for event in pygame.event.get():
+        #KEYBOARD INPUT
+        if event.type == KEYDOWN:
+            if event.key == K_RIGHT:
+                pygame.mixer.Sound.play(soundFX)
+                i = i + 1
+        if event.type == KEYDOWN:
+            if event.key == K_LEFT:
+                pygame.mixer.Sound.play(soundFX)
+                i = i - 1
+        if event.type == KEYDOWN:
+            if event.key == K_RETURN:
+                buttonPressed = True
+
+    if (i > indexLimit):
+        i = 0
+    elif (i < 0):
+        i = indexLimit
+    
+    return i, not buttonPressed
+    
 #--------------------------------------------------------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------------------------------------------------------
@@ -110,11 +178,18 @@ def draw_text(text, font, color, surface, x, y):
 #Rendering Functions
 #The following functions are for rendering menus to the display and can be used externally
 #Render The In-Game Overlay and Get User Input
-def ingame_overlay_main():
+def ingame_overlay_main(gameCurrentlyRunning = True):
     isRunning = True
     init_pygame_runtime(0)
     AssetList = load_ingame_assets()
-    i = 0
+    ButtonList = None
+    ButtonItems = None
+    indexLocation = 0
+
+    if (gameCurrentlyRunning):
+        ButtonItems = ["Return to Game", "Home Menu", "Save Screenshot"]
+    else:
+        ButtonItems = ["Return", "Save Screenshot"]
 
     #Asset Index Values:
     #Menu Open   | Audio | i == 0
@@ -128,32 +203,43 @@ def ingame_overlay_main():
 
     pygame.mixer.Sound.play(AssetList[0])
     while(isRunning):
-        screen.fill(0) #Updates Background Changes
+        screen.fill((0, 0, 0, 128)) #Updates Background Changes
         #Menu Buttons
-        #Back Button
-        button_1 = pygame.draw.circle(screen, primaryColor, (screenX/6, screenY/2), screenY/6)
-        screen.blit(pygame.transform.scale(AssetList[4], (int(screenY/5), int(screenY/5))), (button_1.x + screenY/15, button_1.y + screenY/15))
-        #Home Button
-        button_2 = pygame.draw.circle(screen, primaryColor, (screenX/6 + (screenX/3), screenY/2), screenY/6)
-        screen.blit(pygame.transform.scale(AssetList[3], (int(screenY/5), int(screenY/5))), (button_2.x + screenY/15, button_2.y + screenY/15))
-        #Screenshot Button
-        button_3 = pygame.draw.circle(screen, primaryColor, (screenX/6 + 2*(screenX/3), screenY/2), screenY/6)
-        screen.blit(pygame.transform.scale(AssetList[5], (int(screenY/5), int(screenY/6))), (button_3.x + screenY/15, button_3.y + screenY/13))
+        if (gameCurrentlyRunning):
+            #Back Button
+            button_1 = pygame.draw.circle(screen, primaryColor, (screenX/6, screenY/2), screenY/6)
+            screen.blit(pygame.transform.scale(AssetList[4], (int(screenY/5), int(screenY/5))), (button_1.x + screenY/15, button_1.y + screenY/15))
+            #Home Button
+            button_2 = pygame.draw.circle(screen, primaryColor, (screenX/6 + (screenX/3), screenY/2), screenY/6)
+            screen.blit(pygame.transform.scale(AssetList[3], (int(screenY/5), int(screenY/5))), (button_2.x + screenY/15, button_2.y + screenY/15))
+            #Screenshot Button
+            button_3 = pygame.draw.circle(screen, primaryColor, (screenX/6 + 2*(screenX/3), screenY/2), screenY/6)
+            screen.blit(pygame.transform.scale(AssetList[5], (int(screenY/5), int(screenY/6))), (button_3.x + screenY/15, button_3.y + screenY/13))
+            ButtonList = [button_1, button_2, button_3]
+        else:
+            #Back Button
+            button_1 = pygame.draw.circle(screen, primaryColor, (screenX/3, screenY/2), screenY/6)
+            screen.blit(pygame.transform.scale(AssetList[4], (int(screenY/5), int(screenY/5))), (button_1.x + screenY/15, button_1.y + screenY/15))
+            #Screenshot Button
+            button_2 = pygame.draw.circle(screen, primaryColor, (screenX/3 + screenX/3, screenY/2), screenY/6)
+            screen.blit(pygame.transform.scale(AssetList[5], (int(screenY/5), int(screenY/6))), (button_2.x + screenY/15, button_2.y + screenY/13))
+            ButtonList = [button_1, button_2]
+
         #Update Screen
+        indexLocation, isRunning = get_user_input(AssetList[2], indexLocation, len(ButtonList) - 1)
+        menu_selector(indexLocation, ButtonList, ButtonItems)
         try:
             pyManXLayer.updateLayer()
         except:
             pygame.display.update()
         mainClock.tick(60)
-        if(i >= 500):
-            isRunning = 0
-        else:
-            i = i + 1
 
     #Clear Display and Unload Assets
     del AssetList #Unload Assets
+    del ButtonList
+    del ButtonItems
     end_pygame_runtime() #Close pygame surfaces
-    return
+    return indexLocation
 
 #Display a Notification
 #Functionally, the user cannot interact with these. They are mainly for relaying info to the user.
@@ -199,8 +285,8 @@ def send_system_notification(notificationType, notificationText):
         except:
             pygame.display.update()
         mainClock.tick(60)
-        if(runtime >= 375):
-            isRunning = 0
+        if(runtime >= 325):
+            isRunning = False
         elif(runtime >= 300):
             if (-1 * renderOffset < notificationWidth):
                 renderOffset = renderOffset - notificationWidth/24
@@ -244,8 +330,8 @@ def send_custom_notification(notificationText):
         except:
             pygame.display.update()
         mainClock.tick(60)
-        if(runtime >= 375):
-            isRunning = 0
+        if(runtime >= 325):
+            isRunning = False
         elif(runtime >= 300):
             if (-1 * renderOffset < notificationWidth):
                 renderOffset = renderOffset - notificationWidth/24
@@ -267,4 +353,4 @@ if __name__ == '__main__':
     send_system_notification(1, "Connected") #Controller Update
     send_system_notification(1, "Disconnected")
     send_custom_notification("Just saying hi") #General System Notification
-    ingame_overlay_main()
+    print(ingame_overlay_main())
