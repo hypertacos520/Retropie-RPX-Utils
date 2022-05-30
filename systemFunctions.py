@@ -4,7 +4,7 @@ from PIL import Image
 
 #The process names in the following list will not be affected by the freeze, resume, and terminate functions
 #This list may need modified based on newer retropie installations
-necessaryProcesses = ['bash', 'ps', 'python3', 'sshd', 'systemd', '(sd-pam)', 'dbus-daemon', 'sudo', 'sftp-server', 'xinit', 'Xorg', 'retropie_xinitr']
+necessaryProcesses = ['bash', 'ps', 'python3', 'sshd', 'systemd', '(sd-pam)', 'dbus-daemon', 'sudo', 'sftp-server', 'xinit', 'Xorg', 'retropie_xinitr', 'sh', 'sh <defunct>']
 frontend = 'pegasus-fe' #Can be changed to your frontend
 
 necessaryProcesses.append(frontend)
@@ -161,7 +161,7 @@ def relaunch_pegasus():
 def take_screenshot(save):
     currentDirectory = os.path.dirname(os.path.realpath(__file__))
     if(save):
-        saveLocation = currentDirectory + '../Screenshots/' + str(datetime.now()) + '.png'
+        saveLocation = currentDirectory + '/../Screenshots/' + str(datetime.now()) + '.png'
     else:
         saveLocation = currentDirectory + '/Resources/Temp/Temp.png'
     print(subprocess.run(['raspi2png', '-p', saveLocation], stdout=subprocess.PIPE)) #print is for debug
@@ -173,7 +173,7 @@ def take_screenshot(save):
 def save_temp_screenshot():
     currentDirectory = os.path.dirname(os.path.realpath(__file__))
     temp = Image.open(currentDirectory + '/Resources/Temp/Temp.png')
-    temp.save(currentDirectory + '../Screenshots/' + str(datetime.now()) + '.png')
+    temp.save(currentDirectory + '/../Screenshots/' + str(datetime.now()) + '.png')
     
 
 #testing functions

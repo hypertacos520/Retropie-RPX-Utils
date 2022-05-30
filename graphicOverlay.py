@@ -1,5 +1,7 @@
 import pygame, os, gc
+import systemFunctions as sf
 from pygame.locals import *
+from multiprocessing import Process, Queue
 try:
     import pydispmanx
 except:
@@ -84,15 +86,17 @@ def end_pygame_runtime():
 def load_ingame_assets():
     assets = [] #Asset Buffer
     #Audio
-    assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/open.wav"))                 #Menu Open    | 0
-    assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/back.wav"))                 #Back         | 1
-    assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/move.wav"))                 #Move Cursor  | 2
+    assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/open.wav"))                 #Menu Open       | 0
+    assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/back.wav"))                 #Back            | 1
+    assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/move.wav"))                 #Move Cursor     | 2
     #Graphics
-    assets.append(pygame.image.load(currentDir + "/Resources/Images/home.bmp"))                 #House Icon   | 3
-    assets.append(pygame.image.load(currentDir + "/Resources/Images/backArrow.bmp"))            #Back Icon    | 4
-    assets.append(pygame.image.load(currentDir + "/Resources/Images/screenshot.bmp"))           #Camera Icon  | 5
-    assets.append(pygame.image.load(currentDir + "/Resources/Images/check.bmp"))                #Check Icon   | 6
-    assets.append(pygame.image.load(currentDir + "/Resources/Images/cross-round.bmp"))          #Cross Icon   | 7
+    assets.append(pygame.image.load(currentDir + "/Resources/Images/home.bmp"))                 #House Icon      | 3
+    assets.append(pygame.image.load(currentDir + "/Resources/Images/backArrow.bmp"))            #Back Icon       | 4
+    assets.append(pygame.image.load(currentDir + "/Resources/Images/screenshot.bmp"))           #Camera Icon     | 5
+    assets.append(pygame.image.load(currentDir + "/Resources/Images/check.bmp"))                #Check Icon      | 6
+    assets.append(pygame.image.load(currentDir + "/Resources/Images/cross-round.bmp"))          #Cross Icon      | 7
+    #Screenshot
+    assets.append(pygame.image.load(currentDir + "/Resources/Temp/Temp.bmp"))                   #Temp Screenshot | 8
     return assets #Return the Asset Buffer
 
 def load_notification_assets(load_index = None):
@@ -109,6 +113,10 @@ def load_notification_assets(load_index = None):
         assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/notification.wav"))         #Audio | 0
         assets.append(pygame.image.load(currentDir + "/Resources/Images/controller.bmp"))           #Icon  | 1
         assets.append("Network:")                                                                   #Text  | 2
+    elif(load_index == 3): #Screenshot
+        assets.append(pygame.mixer.Sound(currentDir + "/Resources/Audio/notification.wav"))         #Audio | 0
+        assets.append(pygame.image.load(currentDir + "/Resources/Temp/Temp.bmp"))                   #Icon  | 1
+        assets.append("Screenshot:")                                                                #Text  | 2
     return assets #Return the Asset Buffer
 
 #Draw Text on surface with color and x + y coordinates
@@ -177,8 +185,46 @@ def get_user_input(soundFX, i, indexLimit):
 
 #Rendering Functions
 #The following functions are for rendering menus to the display and can be used externally
+#Render Screenshot Management UI
+def save_screenshot(managePygame = True, AssetList = None):
+    isRunning = True
+    indexLocation = 0
+
+    if managePygame:
+        init_pygame_runtime(0)
+        AssetList = load_ingame_assets()
+
+    while(isRunning):
+        screen.fill((0, 0, 0, 128)) #Updates Background Changes
+        screenshot_surface = pygame.draw.rect(screen, primaryColor, (screenX/4, screenY/10, screenX/2, screenY/2))
+        screen.blit(pygame.transform.scale(AssetList[8], (int(screenshot_surface.width), int(screenshot_surface.height))), (screenshot_surface.x, screenshot_surface.y))
+        button_1 = pygame.draw.circle(screen, primaryColor, (screenX/3, 6*(screenY/7.25)), screenY/8)
+        screen.blit(pygame.transform.scale(AssetList[6], (int(button_1.width/1.5), int(button_1.height/1.5))), (button_1.x + button_1.width/6, button_1.y + button_1.height/6))
+        button_2 = pygame.draw.circle(screen, primaryColor, (screenX/3 + (screenX/3), 6*(screenY/7.25)), screenY/8)
+        screen.blit(pygame.transform.scale(AssetList[7], (int(button_2.width/1.5), int(button_2.height/1.5))), (button_2.x + button_2.width/6, button_2.y + button_2.height/6))
+
+        #Update Screen
+        indexLocation, isRunning = get_user_input(AssetList[2], indexLocation, 1)
+        menu_selector(indexLocation, [button_1, button_2], ["Save", "Cancel"])
+        try:
+            pyManXLayer.updateLayer()
+        except:
+            pygame.display.update()
+        mainClock.tick(60)
+
+    if indexLocation == 0:
+        # sf.save_temp_screenshot()
+        os.popen("python3 notification.py 3 Saved!") #This is a little inefficient but it works 
+
+    #Clear Display and Unload Assets
+    if managePygame:
+        del AssetList #Unload Assets
+        end_pygame_runtime() #Close pygame surfaces
+    
+    return indexLocation
+
 #Render The In-Game Overlay and Get User Input
-def ingame_overlay_main(gameCurrentlyRunning = True):
+def ingame_overlay_main(gameCurrentlyRunning = False):
     isRunning = True
     init_pygame_runtime(0)
     AssetList = load_ingame_assets()
@@ -228,6 +274,16 @@ def ingame_overlay_main(gameCurrentlyRunning = True):
         #Update Screen
         indexLocation, isRunning = get_user_input(AssetList[2], indexLocation, len(ButtonList) - 1)
         menu_selector(indexLocation, ButtonList, ButtonItems)
+        if (gameCurrentlyRunning):
+            if not isRunning and indexLocation == 2:
+                save_screenshot(False, AssetList)
+                init_pygame_runtime(0)
+                isRunning = True
+        else:
+            if not isRunning and indexLocation == 1:
+                save_screenshot(False, AssetList)
+                init_pygame_runtime(0)
+                isRunning = True
         try:
             pyManXLayer.updateLayer()
         except:
@@ -275,7 +331,7 @@ def send_system_notification(notificationType, notificationText):
         pygame.draw.rect(screen, cursorColor, (screenX - notificationWidth - renderOffset, notificationHeight * 1.5, notificationWidth/26, notificationHeight))
 
         #Notification Content
-        screen.blit(icon, (notificationBox.x + notificationWidth/16, notificationBox.y))
+        screen.blit(icon, (notificationBox.x + notificationWidth/26, notificationBox.y))
         draw_text(AssetList[2], font, (255,255,255), screen, notificationBox.x + notificationWidth/3, notificationBox.y + notificationHeight/6)
         draw_text(notificationText, font, (255,255,255), screen, notificationBox.x + notificationWidth/3, notificationBox.y + notificationHeight/2)
 
@@ -348,9 +404,7 @@ def send_custom_notification(notificationText):
 
 #Test Functions
 if __name__ == '__main__':
-    send_system_notification(0, "Climb a Mountain") #Achievement
-    send_system_notification(0, "Close the Game")
+    send_system_notification(0, "Close the Game") #Achievement
     send_system_notification(1, "Connected") #Controller Update
-    send_system_notification(1, "Disconnected")
-    send_custom_notification("Just saying hi") #General System Notification
-    print(ingame_overlay_main())
+    send_custom_notification("I'm Listening") #General System Notification
+    print(ingame_overlay_main(True))

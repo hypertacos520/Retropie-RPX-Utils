@@ -17,6 +17,10 @@ def toggle_quick_menu():
     print("Is a game currently running?: " + str(isInGame))
     if isInGame:
         systemFunctions.freeze_processes() #This line is dangerous to run on the dev computer! Make sure to comment out before testing
+        try:
+            systemFunctions.take_screenshot(0) #Does not work on dev pc
+        except:
+            pass
         menuSelection = go.ingame_overlay_main(isInGame) #New overlay function
         try:
             if menuSelection == 0:
@@ -25,12 +29,6 @@ def toggle_quick_menu():
             elif menuSelection == 1:
                 print("Exiting Current Application...")
                 systemFunctions.terminate_processes()
-            elif menuSelection == 2:
-                try:
-                    systemFunctions.take_screenshot(0) #Does not work on dev pc
-                    #Open save option menu
-                except:
-                    pass
             else:
                 print("No Valid Input Made By User. Resuming Current Application...")
                 systemFunctions.resume_processes()
@@ -41,15 +39,13 @@ def toggle_quick_menu():
         del isInGame
     else:
         systemFunctions.freeze_frontend()
+        try:
+            systemFunctions.take_screenshot(0) #Does not work on dev pc
+        except:
+            pass
         menuSelection = go.ingame_overlay_main(isInGame) #New overlay function
         if menuSelection == 0:
             systemFunctions.resume_frontend()
-        elif menuSelection == 1:
-            try:
-                systemFunctions.take_screenshot(0) #Does not work on dev pc
-                #Open save option menu
-            except:
-                pass
         else:
             print("No Valid Input Made By User. Resuming Current Application...")
             systemFunctions.resume_frontend()
@@ -91,12 +87,14 @@ else:
         if not Gamepad.available():
             print('Awaiting Controller Connection...')
             if(not controllerDisconnectCheck):
-                go.send_system_notification(1, "Disconnected")
+                os.popen("python3 notification.py 1 Disconnected") #This is a little inefficient but it works 
+                # go.send_system_notification(1, "Disconnected")
                 controllerDisconnectCheck = 1
             while not Gamepad.available():
                 time.sleep(1.0)
         gamepad = controllerType()
         print('Controller Connected!')
         controllerDisconnectCheck = 0
-        go.send_system_notification(1, "Connected")
+        os.popen("python3 notification.py 1 Connected") #This is a little inefficient but it works 
+        # go.send_system_notification(1, "Connected")
         controller_loop()
